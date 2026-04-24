@@ -1,0 +1,21 @@
+# ROS 2 Workspace Build Files (CRITICAL TO IGNORE)
+build/
+install/
+log/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# OS/IDE Generated Files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Gazebo/Ignition Logs
+~/.ignition/
+~/.gazebo/
