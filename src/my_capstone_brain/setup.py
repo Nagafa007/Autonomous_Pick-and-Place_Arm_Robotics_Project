@@ -13,19 +13,15 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='mos',
-    maintainer_email='momoashr6@gmail.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
-    extras_require={
-        'test': [
-            'pytest',
-        ],
-    },
+    maintainer='ady',
+    maintainer_email='ady@todo.todo',
+    description='Capstone brain nodes',
+    license='Apache-2.0',
+    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'ik_node = my_capstone_brain.ik_node:main'
+            'ik_node = my_capstone_brain.ik_node:main',
+            'conveyor_node = my_capstone_brain.conveyor_node:main',
         ],
     },
-    
 )

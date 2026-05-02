@@ -8,12 +8,12 @@
 trap 'echo -e "\n[INFO] Shutting down all Capstone nodes..."; kill $(jobs -p); exit' SIGINT
 
 echo "[INFO] Sourcing ROS 2 Workspace..."
-source ~/final_pro/install/setup.bash
-export GZ_SIM_RESOURCE_PATH=/home/mos/final_pro/src/Arduino-Bot
+source ~/ros2_ws/src/Autonomous_Pick-and-Place_Arm_Robotics_Project/install/setup.bash
+export GZ_SIM_RESOURCE_PATH=/home/ady/ros2_ws/src/Autonomous_Pick-and-Place_Arm_Robotics_Project/src/Arduino-Bot
 
 # 2. Start the Physics World in the background (&)
 echo "[INFO] Booting Gazebo Harmonic..."
-ros2 launch ros_gz_sim gz_sim.launch.py gz_args:="empty.sdf -r" &
+ros2 launch ros_gz_sim gz_sim.launch.py gz_args:="/home/ady/ros2_ws/src/Autonomous_Pick-and-Place_Arm_Robotics_Project/worlds/capstone_world.sdf -r" &
 sleep 4 # Give Gazebo 4 seconds to open
 
 # 3. Publish the Blueprint
@@ -46,6 +46,10 @@ echo "==================================================="
 echo "🚀 CAPSTONE SIMULATION ONLINE 🚀"
 echo "Press [Ctrl+C] in this terminal to safely shut down."
 echo "==================================================="
+
+
+echo "[INFO] Starting Conveyor Node..."
+ros2 run my_capstone_brain conveyor_node &
 
 # 8. Keep the script running so the trap works
 wait
