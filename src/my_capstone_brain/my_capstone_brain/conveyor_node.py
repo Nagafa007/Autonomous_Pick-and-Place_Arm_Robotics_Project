@@ -12,11 +12,11 @@ CUBE_SDF = """<?xml version='1.0'?>
                  <iyy>0.00005</iyy><iyz>0</iyz><izz>0.00005</izz></inertia>
       </inertial>
       <collision name='col'>
-        <geometry><box><size>0.06 0.06 0.06</size></box></geometry>
+        <geometry><box><size>0.15 0.15 0.15</size></box></geometry>
         <surface><friction><ode><mu>0.4</mu><mu2>0.4</mu2></ode></friction></surface>
       </collision>
       <visual name='vis'>
-        <geometry><box><size>0.06 0.06 0.06</size></box></geometry>
+        <geometry><box><size>0.15 0.15 0.15</size></box></geometry>
         <material>
           <ambient>{ambient}</ambient>
           <diffuse>{diffuse}</diffuse>
@@ -48,7 +48,7 @@ def spawn_cube(name, x, ambient, diffuse, emissive):
          "-name", name,
          "-x", str(x),
          "-y", "1.2",
-         "-z", "0.115"],
+         "-z", "0.60"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     print(f"[Conveyor] Spawned {name} at x={x}, y=1.2, z=0.115")
