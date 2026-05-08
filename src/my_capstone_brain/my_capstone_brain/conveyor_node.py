@@ -2,6 +2,7 @@
 import rclpy
 from rclpy.node import Node
 import subprocess, time
+import random
 
 CUBE_SDF = """<?xml version='1.0'?>
 <sdf version='1.6'>
@@ -28,12 +29,26 @@ CUBE_SDF = """<?xml version='1.0'?>
   </model>
 </sdf>"""
 
-# x = position along belt, y = 1.2 (belt location), z = 0.115 (on top of belt)
-CUBES = [
-    ("red_cube",    0.20, "1.0 0.0 0.0 1", "0.9 0.0 0.0 1", "0.5 0.0 0.0 1"),
-    ("green_cube",  0.00, "0.0 1.0 0.0 1", "0.0 0.9 0.0 1", "0.0 0.5 0.0 1"),
-    ("blue_cube",  -0.20, "0.0 0.5 1.0 1", "0.0 0.4 1.0 1", "0.0 0.0 0.5 1"),
+# --- DYNAMIC RANDOM CUBE GENERATOR ---
+COLOR_PROFILES = [
+    ("red",   "1.0 0.0 0.0 1", "0.9 0.0 0.0 1", "0.5 0.0 0.0 1"),
+    ("green", "0.0 1.0 0.0 1", "0.0 0.9 0.0 1", "0.0 0.5 0.0 1"),
+    ("blue",  "0.0 0.5 1.0 1", "0.0 0.4 1.0 1", "0.0 0.0 0.5 1"),
 ]
+
+CUBES = []
+NUM_CUBES = 10     # Total number of boxes to spawn
+START_X = 2.2      # Start dropping them near the far right edge of the 5m belt
+SPACING = 0.45     # 45cm gap between each box so they don't touch
+
+for i in range(NUM_CUBES):
+    color_name, amb, dif, emi = random.choice(COLOR_PROFILES)
+    cube_name = f"{color_name}_cube_{i}"  # Unique name (e.g., "red_cube_3")
+    cube_x = START_X - (i * SPACING)      # Spread them down the X-axis
+    CUBES.append((cube_name, cube_x, amb, dif, emi))
+
+
+
 
 def spawn_cube(name, x, ambient, diffuse, emissive):
     sdf = CUBE_SDF.format(name=name, ambient=ambient,
