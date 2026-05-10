@@ -11,7 +11,7 @@ class VisionBrain(Node):
     def __init__(self):
         super().__init__('vision_node')
         
-        # 1. Subscribe to the camera feed
+        # 1. Subscribe to the camera feed (Bridged from Gazebo)
         self.subscription = self.create_subscription(
             Image, 
             '/camera/image', 
@@ -37,14 +37,13 @@ class VisionBrain(Node):
             self.get_logger().error(f"Failed to convert image: {e}")
             return
 
-        # Convert the image from BGR to HSV color space (better for color detection)
+        # Convert the image from BGR to HSV color space
         hsv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
 
         # Define the color range for RED in HSV
-        # Note: Red wraps around the HSV spectrum, so we combine two masks
-        lower_red1 = np.array([0, 120, 70])
+        lower_red1 = np.array([0, 150, 50])
         upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([170, 120, 70])
+        lower_red2 = np.array([170, 150, 50])
         upper_red2 = np.array([180, 255, 255])
 
         mask1 = cv2.inRange(hsv_image, lower_red1, upper_red1)
@@ -55,27 +54,29 @@ class VisionBrain(Node):
         contours, _ = cv2.findContours(full_red_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
         if contours:
-            # Grab the largest red object (ignoring tiny red specks/noise)
             largest_contour = max(contours, key=cv2.contourArea)
             
-            if cv2.contourArea(largest_contour) > 500: # 500 pixels minimum size
-                # Calculate the center of the contour using Image Moments
+            if cv2.contourArea(largest_contour) > 500: 
                 M = cv2.moments(largest_contour)
                 if M['m00'] != 0:
                     pixel_x = int(M['m10'] / M['m00'])
                     pixel_y = int(M['m01'] / M['m00'])
                     
-                    # Optional: Draw a green circle on the center to verify it works visually
+                    # Drawing for visualization (only if display available)
                     cv2.circle(cv_image, (pixel_x, pixel_y), 5, (0, 255, 0), -1)
-                    cv2.imshow("Robot Camera View", cv_image)
-                    cv2.waitKey(1)
                     
                     # --- STEP 4: Pixels to Real-World Coordinates ---
+                    # Camera is at (0, 1.2, 2.0) looking down.
+                    # Image size 640x480.
                     CAMERA_GAZEBO_X = 0.0
                     CAMERA_GAZEBO_Y = 1.2
-                    CAMERA_PIXEL_CX = 320 # Center X of a 640x480 image
-                    CAMERA_PIXEL_CY = 240 # Center Y of a 640x480 image
-                    METERS_PER_PIXEL = 0.0027 
+                    CAMERA_PIXEL_CX = 160 
+                    CAMERA_PIXEL_CY = 120 
+                    
+                    # Based on FoV 1.047 (60 deg) at 2m height:
+                    # width_m = 2 * tan(30 deg) * 2 = 2.3m
+                    # METERS_PER_PIXEL = 2.3 / 320 = 0.0072
+                    METERS_PER_PIXEL = 0.0072 
 
                     # How many pixels is the box away from the center?
                     pixel_dx = pixel_x - CAMERA_PIXEL_CX
@@ -85,16 +86,17 @@ class VisionBrain(Node):
                     meters_dx = pixel_dx * METERS_PER_PIXEL
                     meters_dy = pixel_dy * METERS_PER_PIXEL
 
-                    # Map back to Gazebo World (Applying camera rotation)
-                    world_x = CAMERA_GAZEBO_X - meters_dy 
+                    # Map back to Gazebo World
+                    # Camera orientation 0 1.5708 -1.5708
+                    # This means Image X is World Y, Image Y is World X
+                    world_x = CAMERA_GAZEBO_X + meters_dy 
                     world_y = CAMERA_GAZEBO_Y - meters_dx
-                    world_z = 0.55 # The height of the box resting on the belt
+                    world_z = 0.60 # The height of the box
                     
                     # --- STEP 5: Send Coordinates to IK Node ---
-                    current_time = time.time()
+                    current_time = self.get_clock().now().seconds_nanoseconds()[0]
                     
-                    # Only send a new target if 10 seconds have passed since the last one
-                    if current_time - self.last_target_time > 10.0:
+                    if current_time - self.last_target_time > 15.0: # 15s delay between picks
                         self.get_logger().info(f"BOX TARGET DETECTED: X={world_x:.3f}, Y={world_y:.3f}, Z={world_z:.3f}")
                         
                         target_msg = Point()
@@ -103,9 +105,10 @@ class VisionBrain(Node):
                         target_msg.z = world_z
                         
                         self.target_pub.publish(target_msg)
-                        self.get_logger().info("TARGET SENT TO ARM!")
-                        
-                        self.last_target_time = current_time 
+                        self.last_target_time = float(current_time)
+
+        # Display is removed to prevent flickering windows in WSL
+        pass
 
 def main(args=None):
     rclpy.init(args=args)
