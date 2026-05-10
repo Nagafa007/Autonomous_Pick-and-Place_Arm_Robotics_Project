@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'ik_node = my_capstone_brain.ik_node:main',
             'conveyor_node = my_capstone_brain.conveyor_node:main',
+            'vision_node = my_capstone_brain.vision_node:main'
         ],
     },
 )

@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Point  
 import math
 
 class BrainNode(Node):
@@ -9,15 +10,32 @@ class BrainNode(Node):
         self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
         self.timer = self.create_timer(0.5, self.timer_callback) 
 
+        # --- NEW: SUBSCRIBER TO VISION NODE ---
+        self.subscription = self.create_subscription(
+            Point,
+            '/target_coordinates',
+            self.target_callback,
+            10
+        )
+
         # --- YOUR TARGET COORDINATES (in meters) ---
-        # Right now the target is 15cm forward, 10cm left, and 15cm high.
+        # These are now just default "resting" positions when it first boots up.
+        # They will be overwritten as soon as the camera sees a box!
         self.target_x = 0.15 
-        self.target_y = 0.10
+        self.target_y = 0.0
         self.target_z = 0.15
 
         # EEZYbotARM approximate link lengths (meters)
         self.L1 = 0.135  # Shoulder to Elbow
         self.L2 = 0.147  # Elbow to Wrist
+
+    # --- NEW: CALLBACK FUNCTION ---
+    # This triggers instantly whenever vision_node.py sends a new location
+    def target_callback(self, msg):
+        self.target_x = msg.x
+        self.target_y = msg.y
+        self.target_z = msg.z
+        self.get_logger().info(f"Vision Target Received! Moving to: X={self.target_x:.3f}, Y={self.target_y:.3f}, Z={self.target_z:.3f}")
 
     def timer_callback(self):
         msg = JointState()
@@ -37,7 +55,7 @@ class BrainNode(Node):
 
             # Prevent math errors if you type a coordinate that is too far away
             if cos_theta3 > 1.0 or cos_theta3 < -1.0:
-                self.get_logger().warning("Target is out of reach!")
+                # Silently skip moving if out of reach to avoid crashing
                 return
 
             theta3 = math.acos(cos_theta3)
@@ -49,11 +67,12 @@ class BrainNode(Node):
             msg.position = [theta1, theta2, -theta3, 0.0] 
             self.publisher_.publish(msg)
 
-            # Print the math to the terminal so you can see it working!
-            self.get_logger().info(
-                f"Target: ({self.target_x}, {self.target_y}, {self.target_z}) | "
-                f"Angles: [Base: {math.degrees(theta1):.1f}°, Shoulder: {math.degrees(theta2):.1f}°, Elbow: {math.degrees(-theta3):.1f}°]"
-            )
+            # I commented this out so it doesn't spam your terminal 2 times a second! 
+            # It will now only print when it receives a new vision target above.
+            # self.get_logger().info(
+            #     f"Target: ({self.target_x}, {self.target_y}, {self.target_z}) | "
+            #     f"Angles: [Base: {math.degrees(theta1):.1f}°, Shoulder: {math.degrees(theta2):.1f}°, Elbow: {math.degrees(-theta3):.1f}°]"
+            # )
 
         except Exception as e:
             self.get_logger().error(f"IK Error: {e}")
