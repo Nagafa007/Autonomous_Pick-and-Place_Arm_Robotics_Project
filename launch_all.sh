@@ -41,9 +41,9 @@ ros2 run controller_manager spawner gripper_controller > controller_gripper.log 
 echo "Starting Terminal 5: Conveyor..."
 ros2 run my_capstone_brain conveyor_node > conveyor.log 2>&1 &
 
-echo "Starting Terminal 6: Vision & IK..."
-ros2 run my_capstone_brain vision_node > vision.log 2>&1 &
-ros2 run my_capstone_brain ik_node > ik.log 2>&1 &
+# echo "Starting Terminal 6: Vision & IK..."
+# ros2 run my_capstone_brain vision_node > vision.log 2>&1 &
+# ros2 run my_capstone_brain ik_node > ik.log 2>&1 &
 
 echo "All systems launched. Monitoring Gazebo (PID $GZ_PID)..."
 echo "Check *.log files for details."

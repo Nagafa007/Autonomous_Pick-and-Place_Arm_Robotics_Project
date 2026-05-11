@@ -11,6 +11,7 @@ import subprocess, time
 CUBE_SDF = """<?xml version='1.0'?>
 <sdf version='1.6'>
   <model name='{name}'>
+    <static>true</static>
     <pose>{x} 1.2 0.60 0 0 0</pose>
     <link name='link'>
       <inertial><mass>0.08</mass>
@@ -48,8 +49,8 @@ BELT_Y    = 1.2
 BELT_Z    = 0.60
 STOP_X    = 0.0
 STOP_SEC  = 10.0
-STEP      = 0.10    
-TICK      = 1.0     # Reduced tick rate for stability (1Hz)
+STEP      = 0.04
+TICK      = 0.2     # 5Hz - 0.2 units/sec speed
 
 CUBES = []
 for i in range(NUM_CUBES):
@@ -111,28 +112,7 @@ class ConveyorNode(Node):
         self.create_timer(TICK, self.tick)
 
     def tick(self):
-        if self.belt_state == self.STOPPED:
-            self.stop_elapsed += TICK
-            if self.stop_elapsed >= STOP_SEC:
-                self.stop_elapsed = 0.0
-                self.belt_state   = self.MOVING
-                self.get_logger().info("Belt RESUMING")
-            return
-
-        # Check for crossing
-        crossing = next((c for c in self.cubes if c["x"] > STOP_X >= (c["x"] - STEP)), None)
-
-        if crossing:
-            crossing["x"] = STOP_X
-            self.belt_state = self.STOPPED
-            self.stop_elapsed = 0.0
-            self.get_logger().info(f"STOPPED at {crossing['name']}")
-            # Update just this one to snap it
-            p = set_pose(crossing["name"], STOP_X)
-            p.wait()
-            return
-
-        # Move all
+        # Move all at constant speed
         procs = []
         for cube in self.cubes:
             new_x = cube["x"] - STEP
