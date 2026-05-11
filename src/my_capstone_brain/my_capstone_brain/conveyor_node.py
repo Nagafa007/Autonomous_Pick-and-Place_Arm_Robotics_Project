@@ -49,8 +49,8 @@ BELT_Y    = 1.2
 BELT_Z    = 0.60
 STOP_X    = 0.0
 STOP_SEC  = 10.0
-STEP      = 0.04
-TICK      = 0.2     # 5Hz - 0.2 units/sec speed
+STEP      = 0.02
+TICK      = 0.1     # 10Hz for smoother movement
 
 CUBES = []
 for i in range(NUM_CUBES):

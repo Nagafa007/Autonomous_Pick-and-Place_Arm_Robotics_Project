@@ -26,6 +26,9 @@ class VisionBrain(Node):
         # 3. Setup the Publisher to send coordinates to the IK node
         self.target_pub = self.create_publisher(Point, '/target_coordinates', 10)
         
+        # 4. Debug Image Publisher
+        self.debug_pub = self.create_publisher(Image, '/camera/debug_image', 10)
+        
         # Anti-Spam timeout tracker
         self.last_target_time = 0.0
 
@@ -62,8 +65,9 @@ class VisionBrain(Node):
                     pixel_x = int(M['m10'] / M['m00'])
                     pixel_y = int(M['m01'] / M['m00'])
                     
-                    # Drawing for visualization (only if display available)
-                    cv2.circle(cv_image, (pixel_x, pixel_y), 5, (0, 255, 0), -1)
+                    # Drawing for visualization
+                    cv2.drawMarker(cv_image, (pixel_x, pixel_y), (0, 255, 0), cv2.MARKER_CROSS, 20, 2)
+                    cv2.putText(cv_image, "RED BOX", (pixel_x+10, pixel_y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
                     # --- STEP 4: Pixels to Real-World Coordinates ---
                     # Camera is at (0, 1.2, 2.0) looking down.
@@ -107,8 +111,12 @@ class VisionBrain(Node):
                         self.target_pub.publish(target_msg)
                         self.last_target_time = float(current_time)
 
-        # Display is removed to prevent flickering windows in WSL
-        pass
+        # Publish the debug image back to ROS
+        try:
+            debug_msg = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
+            self.debug_pub.publish(debug_msg)
+        except Exception as e:
+            self.get_logger().error(f"Failed to publish debug image: {e}")
 
 def main(args=None):
     rclpy.init(args=args)
