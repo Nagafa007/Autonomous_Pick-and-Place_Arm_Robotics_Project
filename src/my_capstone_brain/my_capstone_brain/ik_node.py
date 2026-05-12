@@ -1,58 +1,65 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration
 import math
 
-class BrainNode(Node):
+class MycobotIKNode(Node):
     def __init__(self):
-        super().__init__('capstone_brain')
-        self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
+        super().__init__('mycobot_ik_node')
+        self.publisher_ = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
         self.timer = self.create_timer(0.5, self.timer_callback) 
 
-        # --- YOUR TARGET COORDINATES (in meters) ---
-        # Right now the target is 15cm forward, 10cm left, and 15cm high.
+        # --- TARGET COORDINATES (in meters) ---
         self.target_x = 0.15 
         self.target_y = 0.10
         self.target_z = 0.15
 
-        # EEZYbotARM approximate link lengths (meters)
-        self.L1 = 0.135  # Shoulder to Elbow
-        self.L2 = 0.147  # Elbow to Wrist
+        # Mycobot 280 approximate link lengths (meters)
+        self.L1 = 0.13156 # link1 to link2 (height)
+        self.L2 = 0.1104  # link3 to link4
+        self.L3 = 0.096   # link4 to link5
+
+        self.joint_names = [
+            'link1_to_link2', 'link2_to_link3', 'link3_to_link4',
+            'link4_to_link5', 'link5_to_link6', 'link6_to_link6_flange'
+        ]
 
     def timer_callback(self):
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = ['joint_1', 'joint_2', 'joint_3', 'joint_4'] 
+        msg = JointTrajectory()
+        msg.joint_names = self.joint_names
 
+        point = JointTrajectoryPoint()
+        
         try:
-            # 1. Base Rotation (Theta 1)
+            # 1. Base Rotation (J1)
             theta1 = math.atan2(self.target_y, self.target_x)
 
-            # 2. Distance from base to target (planar distance)
+            # 2. Planar distance
             r = math.sqrt(self.target_x**2 + self.target_y**2)
-
-            # 3. Inverse Kinematics for Shoulder and Elbow using Law of Cosines
-            d_sq = r**2 + self.target_z**2
-            cos_theta3 = (d_sq - self.L1**2 - self.L2**2) / (2 * self.L1 * self.L2)
-
-            # Prevent math errors if you type a coordinate that is too far away
-            if cos_theta3 > 1.0 or cos_theta3 < -1.0:
-                self.get_logger().warning("Target is out of reach!")
-                return
-
+            
+            # Simple 3-joint IK mapping for demo purposes
+            adj_z = self.target_z - self.L1
+            
+            d_sq = r**2 + adj_z**2
+            cos_theta3 = (d_sq - self.L2**2 - self.L3**2) / (2 * self.L2 * self.L3)
+            cos_theta3 = max(-1.0, min(1.0, cos_theta3))
+            
             theta3 = math.acos(cos_theta3)
-            theta2 = math.atan2(self.target_z, r) + math.atan2(self.L2 * math.sin(theta3), self.L1 + self.L2 * math.cos(theta3))
+            theta2 = math.atan2(adj_z, r) + math.atan2(self.L3 * math.sin(theta3), self.L2 + self.L3 * math.cos(theta3))
 
-            # Publish the calculated angles to the robot
-            # (Note: Every 3D model has specific 'zero' resting positions. 
-            # We may need to tweak the +/- signs later depending on how Antonio built his URDF)
-            msg.position = [theta1, theta2, -theta3, 0.0] 
+            j2_val = (math.pi/2) - theta2
+            j3_val = -theta3
+            
+            point.positions = [theta1, j2_val, j3_val, 0.0, 0.0, 0.0]
+            point.time_from_start = Duration(sec=0, nanosec=500000000)
+            msg.points.append(point)
+            
             self.publisher_.publish(msg)
 
-            # Print the math to the terminal so you can see it working!
             self.get_logger().info(
                 f"Target: ({self.target_x}, {self.target_y}, {self.target_z}) | "
-                f"Angles: [Base: {math.degrees(theta1):.1f}°, Shoulder: {math.degrees(theta2):.1f}°, Elbow: {math.degrees(-theta3):.1f}°]"
+                f"Published Mycobot Trajectory"
             )
 
         except Exception as e:
@@ -60,7 +67,7 @@ class BrainNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = BrainNode()
+    node = MycobotIKNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

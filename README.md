@@ -178,3 +178,8 @@ _In `rqt_image_view`, select `/image_raw` from the top dropdown to see the top-d
     -   _Cause:_ ROS 2 is trying to compress a 2D RGB stream using a 3D depth algorithm.
         
     -   _Fix:_ Ignore it. It is a false alarm and does not affect the raw `/image_raw` stream.
+-   **Error: `Package 'my_capstone_brain' not found`:**
+
+    -   _Cause:_ You are trying to run a node in a new terminal that hasn't been "sourced" yet.
+    
+    -   _Fix:_ Run `source install/setup.bash` in the new terminal before running any `ros2` commands. Alternatively, use the `launch_capstone.sh` script which handles this for you.

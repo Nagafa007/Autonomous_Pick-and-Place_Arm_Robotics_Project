@@ -36,24 +36,19 @@
       </link>
     </model>
 
-    <!--
-      ARM BASE is at (0, 0, 0), it reaches along +Y axis.
-      Belt is placed in FRONT of the arm at Y=0.55
-      Belt runs left-right along X axis: from x=-0.35 to x=+0.35
-      Belt top surface is at Z=0.085
-    -->
-
-    <!-- Belt surface (dark rubber) -->
-      <model name="conveyor_belt_surface">
+    <!-- ========================================== -->
+    <!-- REAL PHYSICS CONVEYOR BELT (Positioned for Mycobot) -->
+    <!-- ========================================== -->
+    <model name="conveyor_belt_model">
       <static>true</static>
-      <pose>0 1.2 0.5 0 0 0</pose>
+      <pose>0 0.28 0.1 0 0 0</pose>
       <link name="belt_link">
         <collision name="col">
-          <geometry><box><size>5.0 0.6 0.02</size></box></geometry>
-          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+          <geometry><box><size>25.0 0.25 0.02</size></box></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
         </collision>
         <visual name="vis">
-          <geometry><box><size>5.0 0.6 0.02</size></box></geometry>
+          <geometry><box><size>25.0 0.25 0.02</size></box></geometry>
           <material>
             <ambient>0.08 0.08 0.08 1</ambient>
             <diffuse>0.12 0.12 0.12 1</diffuse>
@@ -61,56 +56,60 @@
           </material>
         </visual>
       </link>
+      <plugin filename="gz-sim-track-controller-system" name="gz::sim::systems::TrackController">
+        <link>belt_link</link>
+        <min_velocity>-5.0</min_velocity>
+        <max_velocity>5.0</max_velocity>
+      </plugin>
     </model>
 
-    <!-- Belt rail front -->
+    <!-- Belt rails moved to match belt -->
     <model name="belt_rail_front">
       <static>true</static>
-      <pose>0 1.5 0.5 0 0 0</pose>
+      <pose>0 0.41 0.1 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>5.0 0.015 0.04</size></box></geometry></collision>
+        <collision name="col"><geometry><box><size>25.0 0.015 0.04</size></box></geometry></collision>
         <visual name="vis">
-          <geometry><box><size>5.0 0.015 0.04</size></box></geometry>
+          <geometry><box><size>25.0 0.015 0.04</size></box></geometry>
           <material><ambient>0.9 0.7 0.0 1</ambient><diffuse>0.9 0.7 0.0 1</diffuse><emissive>0.3 0.2 0.0 1</emissive></material>
         </visual>
       </link>
     </model>
 
-    <!-- Belt rail back -->
     <model name="belt_rail_back">
       <static>true</static>
-      <pose>0 0.9 0.5 0 0 0</pose>
+      <pose>0 0.15 0.1 0 0 0</pose>
       <link name="link">
-        <collision name="col"><geometry><box><size>5.0 0.015 0.04</size></box></geometry></collision>
+        <collision name="col"><geometry><box><size>25.0 0.015 0.04</size></box></geometry></collision>
         <visual name="vis">
-          <geometry><box><size>5.0 0.015 0.04</size></box></geometry>
+          <geometry><box><size>25.0 0.015 0.04</size></box></geometry>
           <material><ambient>0.9 0.7 0.0 1</ambient><diffuse>0.9 0.7 0.0 1</diffuse><emissive>0.3 0.2 0.0 1</emissive></material>
         </visual>
       </link>
     </model>
 
-    <!-- 4 legs -->
-    <model name="leg_fl"><static>true</static><pose> 2.4 1.45 0.25 0 0 0</pose>
-      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.5</size></box></geometry></collision>
-        <visual name="vis"><geometry><box><size>0.08 0.08 0.5</size></box></geometry>
+    <!-- legs adjusted for height 0.1 -->
+    <model name="leg_fl"><static>true</static><pose> 12.4 0.40 0.05 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.08 0.08 0.1</size></box></geometry>
           <material><ambient>0.5 0.3 0.0 1</ambient><diffuse>0.5 0.3 0.0 1</diffuse><emissive>0.2 0.1 0.0 1</emissive></material>
         </visual></link></model>
 
-    <model name="leg_fr"><static>true</static><pose>-2.4 1.45 0.25 0 0 0</pose>
-      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.5</size></box></geometry></collision>
-        <visual name="vis"><geometry><box><size>0.08 0.08 0.5</size></box></geometry>
+    <model name="leg_fr"><static>true</static><pose>-12.4 0.40 0.05 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.08 0.08 0.1</size></box></geometry>
           <material><ambient>0.5 0.3 0.0 1</ambient><diffuse>0.5 0.3 0.0 1</diffuse><emissive>0.2 0.1 0.0 1</emissive></material>
         </visual></link></model>
 
-    <model name="leg_bl"><static>true</static><pose> 2.4 0.95 0.25 0 0 0</pose>
-      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.5</size></box></geometry></collision>
-        <visual name="vis"><geometry><box><size>0.08 0.08 0.5</size></box></geometry>
+    <model name="leg_bl"><static>true</static><pose> 12.4 0.16 0.05 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.08 0.08 0.1</size></box></geometry>
           <material><ambient>0.5 0.3 0.0 1</ambient><diffuse>0.5 0.3 0.0 1</diffuse><emissive>0.2 0.1 0.0 1</emissive></material>
         </visual></link></model>
 
-    <model name="leg_br"><static>true</static><pose>-2.4 0.95 0.25 0 0 0</pose>
-      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.5</size></box></geometry></collision>
-        <visual name="vis"><geometry><box><size>0.08 0.08 0.5</size></box></geometry>
+    <model name="leg_br"><static>true</static><pose>-12.4 0.16 0.05 0 0 0</pose>
+      <link name="link"><collision name="col"><geometry><box><size>0.08 0.08 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>0.08 0.08 0.1</size></box></geometry>
           <material><ambient>0.5 0.3 0.0 1</ambient><diffuse>0.5 0.3 0.0 1</diffuse><emissive>0.2 0.1 0.0 1</emissive></material>
         </visual></link></model>
 

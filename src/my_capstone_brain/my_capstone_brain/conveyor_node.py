@@ -1,31 +1,32 @@
-#!/usr/bin/env python3
-"""
-Circular Factory Conveyor
-- All boxes move together at equal spacing
-- Belt fully freezes (all boxes stop exactly where they are)
-- Box reaching belt end teleports to START_X (beginning of belt)
-- Forms fresh groups of 8 naturally due to equal speed
-- Stop time = 10 seconds
-"""
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Float64
 import subprocess, time
+
+# ============================================================
+# CONFIGURABLE SETTINGS
+# ============================================================
+WAIT_TIME      = 10.0   # Seconds the belt pauses (initial wait & between shifts)
+BELT_SPEED     = 0.05    # Reduced speed for smaller scale
+SHIFT_DISTANCE = 0.4    
+# ============================================================
 
 CUBE_SDF = """<?xml version='1.0'?>
 <sdf version='1.6'>
   <model name='{name}'>
-    <pose>{x} 1.2 0.60 0 0 0</pose>
+    <pose>0 0 0 0 0 0</pose>
+    <allow_auto_disable>false</allow_auto_disable>
     <link name='link'>
-      <inertial><mass>0.08</mass>
-        <inertia><ixx>0.00005</ixx><ixy>0</ixy><ixz>0</ixz>
-                 <iyy>0.00005</iyy><iyz>0</iyz><izz>0.00005</izz></inertia>
+      <inertial><mass>0.05</mass>
+        <inertia><ixx>0.00001</ixx><ixy>0</ixy><ixz>0</ixz>
+                 <iyy>0.00001</iyy><iyz>0</iyz><izz>0.00001</izz></inertia>
       </inertial>
       <collision name='col'>
-        <geometry><box><size>0.15 0.15 0.15</size></box></geometry>
-        <surface><friction><ode><mu>0.4</mu><mu2>0.4</mu2></ode></friction></surface>
+        <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
+        <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
       </collision>
       <visual name='vis'>
-        <geometry><box><size>0.15 0.15 0.15</size></box></geometry>
+        <geometry><box><size>0.05 0.05 0.05</size></box></geometry>
         <material>
           <ambient>{ambient}</ambient>
           <diffuse>{diffuse}</diffuse>
@@ -43,135 +44,86 @@ COLOR_PROFILES = [
     ("blue",  "0.0 0.5 1.0 1", "0.0 0.4 1.0 1", "0.0 0.0 0.5 1"),
 ]
 
-NUM_CUBES = 8
-START_X   = 2.2     # Right edge of belt — recycled boxes appear here
-END_X     = -2.5    # Left edge — boxes recycle when they cross this
-SPACING   = 0.45
-BELT_Y    = 1.2
-BELT_Z    = 0.60
-STOP_X    = 0.0     # In front of arm
-STOP_SEC  = 10.0
-STEP      = 0.05    # Meters per tick
-TICK      = 0.5     # Seconds per tick
-
-CUBES = []
-for i in range(NUM_CUBES):
-    color_name, amb, dif, emi = COLOR_PROFILES[i % len(COLOR_PROFILES)]
-    CUBES.append({
-        "name":     f"{color_name}_cube_{i}",
-        "x":        START_X - (i * SPACING),
-        "ambient":  amb,
-        "diffuse":  dif,
-        "emissive": emi,
-    })
-
+NUM_CUBES = 6
+START_X   = 0.5
+SPACING   = 0.4
 
 def spawn_cube(cube):
+    """Spawn a cube into Gazebo using physical drops."""
     sdf = CUBE_SDF.format(
-        name=cube["name"], x=cube["x"],
+        name=cube["name"],
         ambient=cube["ambient"], diffuse=cube["diffuse"],
         emissive=cube["emissive"]
     )
     path = f"/tmp/{cube['name']}.sdf"
     with open(path, "w") as f:
         f.write(sdf)
+    
     subprocess.Popen(
-        ["ros2", "run", "ros_gz_sim", "create",
-         "-file", path, "-name", cube["name"],
-         "-x", str(cube["x"]), "-y", str(BELT_Y), "-z", str(BELT_Z)],
+        ["ros2", "run", "ros_gz_sim", "create", 
+         "-file", path, 
+         "-name", cube["name"],
+         "-x", str(cube["x"]),
+         "-y", "0.28",
+         "-z", "0.25"], 
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
-    print(f"[Conveyor] Spawned {cube['name']} at x={cube['x']:.2f}")
-
-
-def set_pose(name, x):
-    req = (f'name: "{name}" '
-           f'position: {{x: {x:.3f}, y: {BELT_Y}, z: {BELT_Z}}} '
-           f'orientation: {{w: 1.0, x: 0.0, y: 0.0, z: 0.0}}')
-    subprocess.Popen([
-        "gz", "service",
-        "-s", "/world/capstone_world/set_pose",
-        "--reqtype", "gz.msgs.Pose",
-        "--reptype", "gz.msgs.Boolean",
-        "--timeout", "300", "--req", req
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
 
 class ConveyorNode(Node):
-
-    MOVING  = "MOVING"
-    STOPPED = "STOPPED"
-
     def __init__(self):
         super().__init__("conveyor_node")
-        self.get_logger().info("Waiting for world to load...")
-        time.sleep(5.0)
-
-        self.cubes        = CUBES
-        self.belt_state   = self.MOVING
-        self.stop_elapsed = 0.0
-
-        for cube in self.cubes:
-            spawn_cube(cube)
-            time.sleep(0.8)
-
-        self.get_logger().info("=" * 50)
-        self.get_logger().info("  CONVEYOR RUNNING ▶")
-        self.get_logger().info("=" * 50)
-        self.create_timer(TICK, self.tick)
-
-    # ------------------------------------------------------------------
-    def tick(self):
-
-        # ── BELT STOPPED ───────────────────────────────────────────────
-        if self.belt_state == self.STOPPED:
-            self.stop_elapsed += TICK
-            remaining = STOP_SEC - self.stop_elapsed
-            if remaining > 0:
-                self.get_logger().info(
-                    f"  🛑 Belt stopped — resuming in {remaining:.0f}s")
-            else:
-                self.stop_elapsed = 0.0
-                self.belt_state   = self.MOVING
-                self.get_logger().info("  ▶ Belt RESUMING")
-            return   # ← ALL boxes stay frozen, nothing moves
-
-        # ── BELT MOVING ────────────────────────────────────────────────
-
-        # Check first if any box will cross STOP_X this tick
-        crossing = next(
-            (c for c in self.cubes
-             if c["x"] > STOP_X >= (c["x"] - STEP)),
-            None
+        
+        self.belt_pub = self.create_publisher(
+            Float64, 
+            '/model/conveyor_belt_model/link/belt_link/track_cmd_vel', 
+            10
         )
+        
+        self.get_logger().info("Waiting 3s for Gazebo physics to settle...")
+        time.sleep(3.0)
 
-        if crossing:
-            # Snap crossing box to arm position exactly
-            crossing["x"] = STOP_X
-            set_pose(crossing["name"], STOP_X)
+        # Spawn cubes 
+        for i in range(NUM_CUBES):
+            color_name, amb, dif, emi = COLOR_PROFILES[i % len(COLOR_PROFILES)]
+            cube = {
+                "name": f"{color_name}_cube_{i}",
+                "x":    START_X - (i * SPACING),
+                "ambient": amb, "diffuse": dif, "emissive": emi,
+            }
+            spawn_cube(cube)
+            self.get_logger().info(f"Dropped {cube['name']} onto the belt at x={cube['x']:.1f}")
+            time.sleep(0.5)
 
-            # ALL other boxes stay exactly where they are — don't move them
-            self.belt_state   = self.STOPPED
-            self.stop_elapsed = 0.0
-            self.get_logger().info("=" * 50)
-            self.get_logger().info(
-                f"  🛑 [{crossing['name']}] at arm — BELT STOPPED (10s)")
-            self.get_logger().info("=" * 50)
-            return
+        self.state = "WAITING"
+        self.state_start_time = self.get_clock().now()
+        self.move_duration = SHIFT_DISTANCE / BELT_SPEED
+        
+        self.create_timer(0.1, self.tick)
+        self.get_logger().info(f"Conveyor ready! | Shift Distance = {SHIFT_DISTANCE}m | Wait = {WAIT_TIME}s")
 
-        # No stop triggered — move ALL boxes by one step
-        for cube in self.cubes:
-            new_x = cube["x"] - STEP
+    def tick(self):
+        now = self.get_clock().now()
+        elapsed = (now.nanoseconds - self.state_start_time.nanoseconds) / 1e9
+        
+        msg = Float64()
 
-            # ♻ Box reached belt end → teleport to START_X
-            if new_x <= END_X:
-                new_x = START_X
-                self.get_logger().info(
-                    f"  ♻ [{cube['name']}] recycled → back to x={START_X}")
+        if self.state == "WAITING":
+            msg.data = 0.0
+            self.belt_pub.publish(msg)
+            
+            if elapsed >= WAIT_TIME:
+                self.state = "MOVING"
+                self.state_start_time = now
+                self.get_logger().info(f"▶▶▶ BELT MOVING: Shifting cubes by {SHIFT_DISTANCE} meters...")
 
-            cube["x"] = new_x
-            set_pose(cube["name"], new_x)
-
+        elif self.state == "MOVING":
+            msg.data = -BELT_SPEED 
+            self.belt_pub.publish(msg)
+            
+            if elapsed >= self.move_duration:
+                self.state = "WAITING"
+                self.state_start_time = now
+                self.get_logger().info(f"🛑 BELT STOPPED: Waiting {WAIT_TIME}s for arm interaction...")
 
 def main(args=None):
     rclpy.init(args=args)
